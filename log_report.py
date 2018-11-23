@@ -6,12 +6,11 @@ import psycopg2
 most_popular_articles = """
     select
         '"' || title || '"',
-        (select count(id)
-            from log
-            where log.path
-            like '%' || articles.slug || '%'
-        ) as views
+        count(log.id) as views
     from articles
+    join log on log.path like '%' || articles.slug
+    where log.status = '200 OK'
+    group by title
     order by views desc
     limit 3
 """
@@ -19,10 +18,11 @@ most_popular_articles = """
 most_popular_authors = """
     select
         name,
-        (select count(log.id)
-        from articles, log
-        where log.path like '%' || articles.slug || '%') as views
+        count(log.id) as views
     from authors
+    join articles on articles.author = authors.id
+    join log on log.path like '%' || articles.slug
+    group by name
     order by views desc
     limit 3
 """
@@ -35,15 +35,10 @@ days_errors_above_one_percent = """
             /
             count(id) * 100
             , 1
-        )
+        ) AS percentage
     from log
     group by time::date
-    having round(
-        count(case when status <> '200 OK' then 1 end)::decimal
-        /
-        count(id) * 100
-        , 1
-        ) >= 1
+    having percentage >= 1
 """
 
 
@@ -70,12 +65,12 @@ print_results(query_db(most_popular_articles))
 
 print('\n')
 
-# Print Most Popular Authors
+# # Print Most Popular Authors
 print("Most Popular Authors: ")
 print_results(query_db(most_popular_authors))
 
 print('\n')
 
-# Print Days Where Errors Exceeded 1%
+# # # Print Days Where Errors Exceeded 1%
 print("Days where errors exceeded 1% of requests: ")
 print_results(query_db(days_errors_above_one_percent))
